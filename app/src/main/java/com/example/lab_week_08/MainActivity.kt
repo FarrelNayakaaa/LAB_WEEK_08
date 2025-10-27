@@ -89,6 +89,7 @@ class MainActivity : AppCompatActivity() {
     private fun launchNotificationService() {
         NotificationService.trackingCompletion.observe(this) { Id ->
             showResult("Process for Notification Channel ID $Id is done!")
+            launchThirdWorker() // ⬅️ Panggil setelah notifikasi pertama selesai
         }
 
         val serviceIntent = Intent(this, NotificationService::class.java).apply {
@@ -97,4 +98,42 @@ class MainActivity : AppCompatActivity() {
 
         ContextCompat.startForegroundService(this, serviceIntent)
     }
+
+    // Jalankan ThirdWorker setelah notifikasi pertama selesai
+    private fun launchThirdWorker() {
+        val networkConstraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val id = "002"
+
+        val thirdRequest = OneTimeWorkRequest.Builder(com.example.lab_week_08.worker.ThirdWorker::class.java)
+            .setConstraints(networkConstraints)
+            .setInputData(getIdInputData(com.example.lab_week_08.worker.ThirdWorker.INPUT_DATA_ID, id))
+            .build()
+
+        val workManager = WorkManager.getInstance(this)
+        workManager.enqueue(thirdRequest)
+
+        workManager.getWorkInfoByIdLiveData(thirdRequest.id).observe(this) { info ->
+            if (info.state.isFinished) {
+                showResult("Third process is done")
+                launchSecondNotificationService()
+            }
+        }
+    }
+
+    // Jalankan Foreground Service kedua
+    private fun launchSecondNotificationService() {
+        SecondNotificationService.trackingCompletion.observe(this) { Id ->
+            showResult("Process for Notification Channel ID $Id is done!")
+        }
+
+        val serviceIntent = Intent(this, SecondNotificationService::class.java).apply {
+            putExtra(SecondNotificationService.EXTRA_ID, "002")
+        }
+
+        ContextCompat.startForegroundService(this, serviceIntent)
+    }
+
 }
